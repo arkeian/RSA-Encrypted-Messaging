@@ -1,6 +1,6 @@
 import java.math.BigInteger;
 
-public class RSAEncryption {
+public class ModularArithmetic {
     public static BigInteger modularExponentiation(BigInteger m, BigInteger e, BigInteger n) {
         if (m.compareTo(n) >= 0 || m.compareTo(BigInteger.ZERO) < 0 || e.compareTo(BigInteger.ZERO) <= 0 || n.compareTo(BigInteger.ONE) <= 0) { // if m < 0 or e <= 0 or n <= 1
             throw new IllegalArgumentException("Plaintext block (m) must be 0 <= m < n, exponent (e) must be > 0, and modulus (n) must be > 1");

@@ -27,7 +27,7 @@ public class PQGeneration {
         BigInteger base = generateUniformRandomInteger(n.subtract(BigInteger.valueOf(3)), random).add(BigInteger.TWO);
 
         // x = base^d mod n
-        BigInteger x = RSAEncryption.modularExponentiation(base, d, n);
+        BigInteger x = ModularArithmetic.modularExponentiation(base, d, n);
 
         if (x.equals(BigInteger.ONE) || x.equals(n.subtract(BigInteger.ONE))) {
             return true;
