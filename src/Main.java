@@ -1,4 +1,5 @@
 import java.math.BigInteger;
+import java.util.Scanner;
 
 public class Main {
     public static void main(String[] args) {
@@ -38,5 +39,42 @@ public class Main {
         if (!e.multiply(d).mod(phi).equals(BigInteger.ONE) || p.equals(q) || n.compareTo(BigInteger.valueOf(256)) < 0) {
             throw new IllegalStateException("the generated RSA key-values failed validation checks");
         }
+
+        // Meminta input text dari User
+        Scanner scanner = new Scanner(System.in);
+        System.out.print("Enter message: ");
+        String input = scanner.nextLine();
+
+        // Enkode UTF-8
+        byte[] inputAsBytes = TextFormatting.encodeTextToBytes(input);
+
+        // Menyimpan panjang awal text dalam format bytes
+        int inputLengthAsBytes = inputAsBytes.length;
+
+        // Menghitung berapa jumlah bytes yang bisa dimuat ke dalam satu block
+        int plaintextBlockSize = TextFormatting.calculatePlaintextBlockSize(n);
+
+        // Memecah bytes dari text awal ke dalam blocks sesuai dengan ukuran plaintextBlockSize
+        BigInteger[] plaintextBlocks = TextFormatting.convertBytesToBlocks(inputAsBytes, plaintextBlockSize);
+
+        // Membuat array untuk menyimpan cipherteks dan teks yang sudah di dekripsi
+        BigInteger[] ciphertextBlocks = new BigInteger[plaintextBlocks.length];
+        BigInteger[] decryptedBlocks = new BigInteger[plaintextBlocks.length];
+
+        // Melakukan enkripsi RSA ci = mi^e mod n pada setiap block
+        for (int i = 0; i < plaintextBlocks.length; i++) {
+            ciphertextBlocks[i] = ModularArithmetic.modularExponentiation(plaintextBlocks[i], e, n);
+            // Melakukan dekripsi RSA mi' = ci^d mod n pada setiap block
+            decryptedBlocks[i] = ModularArithmetic.modularExponentiation(ciphertextBlocks[i], d, n);
+        }
+
+        // Mengubah kembali blocks ke dalam bentuk teks
+        String decipheredText = TextFormatting.revertBlocksToText(decryptedBlocks, plaintextBlockSize, inputLengthAsBytes);
+
+        if (!input.equals(decipheredText)) {
+            throw new IllegalStateException("the recovered text does not match the input");
+        }
+
+        System.out.println("Deciphered message: " + decipheredText);
     }
 }
