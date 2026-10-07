@@ -1,9 +1,9 @@
 import java.math.BigInteger;
 
 public class RSAEncryption {
-    public static BigInteger encryptBlock(BigInteger m, BigInteger e, BigInteger n) {
-        if (m.compareTo(n) >= 0 || m.compareTo(BigInteger.ZERO) < 0 || e.compareTo(BigInteger.ZERO) < 0 || n.compareTo(BigInteger.ONE) <= 0) { // if m < 0 or e < 0 or n <= 1
-            throw new IllegalArgumentException("Plaintext block (m) must be 0 <= m < n, exponent (e) must be >= 0, and modulus (n) must be > 1");
+    public static BigInteger modularExponentiation(BigInteger m, BigInteger e, BigInteger n) {
+        if (m.compareTo(n) >= 0 || m.compareTo(BigInteger.ZERO) < 0 || e.compareTo(BigInteger.ZERO) <= 0 || n.compareTo(BigInteger.ONE) <= 0) { // if m < 0 or e <= 0 or n <= 1
+            throw new IllegalArgumentException("Plaintext block (m) must be 0 <= m < n, exponent (e) must be > 0, and modulus (n) must be > 1");
         }
 
         BigInteger result = BigInteger.valueOf(1); // result = 1
