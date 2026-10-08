@@ -28,12 +28,9 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            max-width: min(520px, calc(100vw - 40px));
-            text-align: center;
         }
 
         .spinner {
-            flex: 0 0 auto;
             width: 22px;
             height: 22px;
             border: 3px solid #d9d9d9;
@@ -57,41 +54,30 @@
             font: 11px sans-serif;
         }
     </style>
+    <script src="https://cjrtnc.leaningtech.com/4.3/loader.js"></script>
 </head>
 <body>
     <div id="loading" role="status" aria-live="polite">
         <div class="loading-content">
             <span class="spinner" aria-hidden="true"></span>
-            <span id="loading-message">Preparing Amaca...</span>
+            <span>Loading...</span>
         </div>
     </div>
     <div id="display"></div>
     <a id="credit" href="https://cheerpj.com" target="_blank" rel="noreferrer">Powered by CheerpJ</a>
 
     <script type="module">
+        import {joinRoom} from "https://esm.run/trystero@0.25.0";
+
         let room = null;
         let packetAction = null;
         let javaListener = null;
         const loading = document.getElementById("loading");
-        const loadingMessage = document.getElementById("loading-message");
-        const spinner = loading.querySelector(".spinner");
-        let startupPhase = "Loading CheerpJ Java runtime...";
-        let trysteroRoomFactory = null;
-        const startupTimer = window.setInterval(() => {
-            if (loading.style.display !== "none") {
-                loadingMessage.textContent = startupPhase + " This is taking longer than usual; check your internet connection and keep this tab open.";
-            }
-        }, 20_000);
-        const defaultNostrRelays = [
-            "wss://nos.lol",
-            "wss://relay.primal.net",
-            "wss://relay.snort.social",
-            "wss://nostr.wine"
-        ];
-        const trysteroConfig = {
-            appId: "io.github.arkeian.amaca",
-            relayConfig: {urls: defaultNostrRelays}
-        };
+        const trysteroConfig = {appId: "io.github.arkeian.amaca"};
+
+        if (Array.isArray(globalThis.RSA_CHAT_TURN_SERVERS) && globalThis.RSA_CHAT_TURN_SERVERS.length > 0) {
+            trysteroConfig.turnConfig = globalThis.RSA_CHAT_TURN_SERVERS;
+        }
 
         async function Java_ConnectionAdapter_registerListener(lib, listener) {
             javaListener = listener;
@@ -99,20 +85,7 @@
         }
 
         function Java_ConnectionAdapter_notifyApplicationLoaded() {
-            window.clearInterval(startupTimer);
             loading.style.display = "none";
-        }
-
-        async function loadTrysteroRoomFactory() {
-            if (!trysteroRoomFactory) {
-                trysteroRoomFactory = import("https://esm.run/trystero@0.25.0")
-                    .then(module => module.joinRoom)
-                    .catch(error => {
-                        trysteroRoomFactory = null;
-                        throw error;
-                    });
-            }
-            return trysteroRoomFactory;
         }
 
         async function reportError(error) {
@@ -125,7 +98,6 @@
 
         async function Java_ConnectionAdapter_joinRoom(lib, roomId) {
             try {
-                const joinRoom = await loadTrysteroRoomFactory();
                 room?.leave();
                 room = joinRoom(
                     trysteroConfig,
@@ -165,51 +137,6 @@
                 .catch(error => reportError(error));
         }
 
-        function copyWithLegacyClipboard(text) {
-            const input = document.createElement("textarea");
-            input.value = text;
-            input.style.position = "fixed";
-            input.style.opacity = "0";
-            document.body.append(input);
-            try {
-                input.select();
-                return document.execCommand("copy");
-            } finally {
-                input.remove();
-            }
-        }
-
-        async function Java_ConnectionAdapter_copyText(lib, text) {
-            const value = String(text);
-            let copied = false;
-            let errorMessage = "Clipboard access is unavailable";
-
-            try {
-                if (navigator.clipboard?.writeText) {
-                    await navigator.clipboard.writeText(value);
-                    copied = true;
-                } else {
-                    copied = copyWithLegacyClipboard(value);
-                }
-            } catch (error) {
-                errorMessage = String(error?.message ?? error);
-            }
-
-            if (!copied) {
-                try {
-                    copied = copyWithLegacyClipboard(value);
-                } catch (error) {
-                    errorMessage = String(error?.message ?? error);
-                }
-            }
-
-            if (copied) {
-                await javaListener?.clipboardCopied();
-            } else {
-                await javaListener?.clipboardFailed(errorMessage);
-            }
-        }
-
         async function Java_ConnectionAdapter_leaveRoom() {
             room?.leave();
             room = null;
@@ -217,35 +144,6 @@
         }
 
         try {
-            const loaderScript = document.createElement("script");
-            loaderScript.src = "https://cjrtnc.leaningtech.com/4.3/loader.js";
-            const loaderReady = new Promise((resolve, reject) => {
-                loaderScript.addEventListener("load", resolve, {once: true});
-                loaderScript.addEventListener("error", () => reject(new Error("Could not download the CheerpJ runtime loader.")), {once: true});
-            });
-            document.head.append(loaderScript);
-            await loaderReady;
-
-            const configuredRelays = globalThis.RSA_CHAT_NOSTR_RELAYS;
-            if (configuredRelays !== undefined) {
-                if (!Array.isArray(configuredRelays)
-                        || configuredRelays.length === 0
-                        || !configuredRelays.every(url => typeof url === "string" && url.startsWith("wss://"))) {
-                    throw new Error("RSA_CHAT_NOSTR_RELAYS must be a non-empty list of wss:// URLs");
-                }
-                trysteroConfig.relayConfig.urls = configuredRelays;
-            }
-
-            const turnServers = globalThis.RSA_CHAT_TURN_SERVERS;
-            if (turnServers !== undefined) {
-                if (!Array.isArray(turnServers) || turnServers.length === 0) {
-                    throw new Error("RSA_CHAT_TURN_SERVERS must be a non-empty list of ICE server configurations");
-                }
-                trysteroConfig.turnConfig = turnServers;
-            }
-
-            startupPhase = "Starting the Java runtime...";
-            loadingMessage.textContent = startupPhase;
             await cheerpjInit({
                 version: 17,
                 natives: {
@@ -253,14 +151,11 @@
                     Java_ConnectionAdapter_notifyApplicationLoaded,
                     Java_ConnectionAdapter_joinRoom,
                     Java_ConnectionAdapter_sendPacket,
-                    Java_ConnectionAdapter_copyText,
                     Java_ConnectionAdapter_leaveRoom
                 }
             });
             cheerpjCreateDisplay(-1, -1, document.getElementById("display"));
 
-            startupPhase = "Starting the Amaca application...";
-            loadingMessage.textContent = startupPhase;
             const applicationUrl = new URL(window.location.href);
             const requestedRoom = new URLSearchParams(applicationUrl.hash.substring(1)).get("room") ?? "";
             const applicationDirectory = new URL(".", applicationUrl).pathname.replace(/\/$/, "");
@@ -274,9 +169,7 @@
                 requestedRoom
             );
         } catch (error) {
-            window.clearInterval(startupTimer);
-            spinner.style.display = "none";
-            loadingMessage.textContent = "Amaca could not start: " + String(error?.message ?? error);
+            loading.textContent = "Java runtime failed to load.";
             loading.style.display = "grid";
             console.error(error);
         }
