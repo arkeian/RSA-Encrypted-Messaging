@@ -34,6 +34,7 @@
         let room = null;
         let packetAction = null;
         let javaListener = null;
+        const loading = document.getElementById("loading");
         const trysteroConfig = {appId: "io.github.rsa-encrypted-messaging"};
 
         if (Array.isArray(globalThis.RSA_CHAT_TURN_SERVERS) && globalThis.RSA_CHAT_TURN_SERVERS.length > 0) {
@@ -111,7 +112,7 @@
                 }
             });
             cheerpjCreateDisplay(-1, -1, document.getElementById("display"));
-            document.getElementById("loading").remove();
+            loading.style.display = "none";
 
             const applicationUrl = new URL(window.location.href);
             const requestedRoom = new URLSearchParams(applicationUrl.hash.substring(1)).get("room") ?? "";
@@ -124,7 +125,8 @@
                 requestedRoom
             );
         } catch (error) {
-            document.getElementById("loading").textContent = "Java runtime failed to load.";
+            loading.textContent = "Java runtime failed to load.";
+            loading.style.display = "grid";
             console.error(error);
         }
     </script>
