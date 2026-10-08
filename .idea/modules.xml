@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/RSA-Encrypted-Messaging.iml" filepath="$PROJECT_DIR$/.idea/RSA-Encrypted-Messaging.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/Amaca.iml" filepath="$PROJECT_DIR$/.idea/Amaca.iml" />
     </modules>
   </component>
 </project>

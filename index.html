@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>RSA Chitchat</title>
+    <title>Amaca</title>
     <style>
         html, body, #display {
             width: 100%;
@@ -45,7 +45,7 @@
         let packetAction = null;
         let javaListener = null;
         const loading = document.getElementById("loading");
-        const trysteroConfig = {appId: "io.github.rsa-encrypted-messaging"};
+        const trysteroConfig = {appId: "io.github.arkeian.amaca"};
 
         if (Array.isArray(globalThis.RSA_CHAT_TURN_SERVERS) && globalThis.RSA_CHAT_TURN_SERVERS.length > 0) {
             trysteroConfig.turnConfig = globalThis.RSA_CHAT_TURN_SERVERS;
@@ -126,11 +126,13 @@
 
             const applicationUrl = new URL(window.location.href);
             const requestedRoom = new URLSearchParams(applicationUrl.hash.substring(1)).get("room") ?? "";
+            const applicationDirectory = new URL(".", applicationUrl).pathname.replace(/\/$/, "");
+            const applicationClassPath = "/app" + applicationDirectory;
             applicationUrl.search = "";
             applicationUrl.hash = "";
             await cheerpjRunMain(
                 "Main",
-                "/app/out/browser/rsa-encrypted-messaging.jar:/app/lib/zxing-core-3.5.4.jar",
+                applicationClassPath + "/out/browser/amaca.jar:" + applicationClassPath + "/lib/zxing-core-3.5.4.jar",
                 applicationUrl.href,
                 requestedRoom
             );

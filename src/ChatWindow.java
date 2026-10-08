@@ -25,7 +25,7 @@ public final class ChatWindow {
     private static final Color PANEL = new Color(34, 37, 49);
     private static final Color TEXT = new Color(238, 239, 244);
 
-    private final JFrame frame = new JFrame("RSA Chitchat");
+    private final JFrame frame = new JFrame("Amaca");
     private final JTextField displayName = new JTextField("Guest");
     private final JTextField roomInput = new JTextField();
     private final JButton createRoom = new JButton("Create room");

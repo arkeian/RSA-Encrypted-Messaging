@@ -353,13 +353,14 @@ public class Main implements ConnectionAdapter.Listener {
             }
 
             String messageIdentifier = PacketHandler.parseAcknowledgementPacket(packet);
-            window.markDelivered(messageIdentifier);
             String deliveredDraft = pendingDrafts.remove(messageIdentifier);
 
-            if (deliveredDraft != null) {
-                window.clearMessageInput(deliveredDraft);
+            if (deliveredDraft == null) {
+                throw new IllegalArgumentException("unknown acknowledgement");
             }
 
+            window.markDelivered(messageIdentifier);
+            window.clearMessageInput(deliveredDraft);
             window.setStatus("Ready. Message delivered.");
 
         } catch (RuntimeException exception) {
