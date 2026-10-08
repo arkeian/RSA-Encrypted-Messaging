@@ -21,12 +21,22 @@
             color: #eeeff4;
             font: 18px sans-serif;
         }
+
+        #credit {
+            position: fixed;
+            right: 8px;
+            bottom: 4px;
+            z-index: 1;
+            color: #aeb2c0;
+            font: 11px sans-serif;
+        }
     </style>
     <script src="https://cjrtnc.leaningtech.com/4.3/loader.js"></script>
 </head>
 <body>
     <div id="loading" role="status" aria-live="polite">Loading Java runtime...</div>
     <div id="display"></div>
+    <a id="credit" href="https://cheerpj.com" target="_blank" rel="noreferrer">Powered by CheerpJ</a>
 
     <script type="module">
         import {joinRoom} from "https://esm.run/trystero@0.25.0";
