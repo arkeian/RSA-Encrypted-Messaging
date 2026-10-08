@@ -35,7 +35,7 @@ public final class ChatWindow {
     private final QrCodePanel qrCode = new QrCodePanel();
     private final JTextArea fingerprints = new JTextArea(7, 20);
     private final JButton confirmFingerprints = new JButton("Confirm fingerprints");
-    private final JLabel status = new JLabel("Starting...");
+    private final JLabel status = new JLabel("Generating keys...");
     private final DefaultListModel<Message> messages = new DefaultListModel<>();
     private final JList<Message> messageList = new JList<>(messages);
     private final JTextField messageInput = new JTextField();
@@ -219,8 +219,10 @@ public final class ChatWindow {
         return messageInput.getText();
     }
 
-    public void clearMessageInput() {
-        messageInput.setText("");
+    public void clearMessageInput(String deliveredDraft) {
+        if (messageInput.getText().equals(deliveredDraft)) {
+            messageInput.setText("");
+        }
     }
 
     public void setKeysReady(boolean ready) {

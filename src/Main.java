@@ -24,6 +24,7 @@ public class Main implements ConnectionAdapter.Listener {
 
     private final ChatWindow window = new ChatWindow();
     private final Map<String, Peer> peers = new ConcurrentHashMap<>();
+    private final Map<String, String> pendingDrafts = new ConcurrentHashMap<>();
     private final String applicationUrl;
     private final String requestedRoom;
 
@@ -51,7 +52,7 @@ public class Main implements ConnectionAdapter.Listener {
     }
 
     private void generateKeys() {
-        window.setStatus("Generating 2048-bit RSA key pair...");
+        window.setStatus("Generating keys...");
 
         new SwingWorker<Void, Void>() {
             @Override
@@ -93,7 +94,7 @@ public class Main implements ConnectionAdapter.Listener {
                     window.setKeysReady(true);
                     window.setLocalFingerprint(fingerprint(n, e));
                     window.setKeyPresentation(RsaPresentationRecord.keyGeneration(p, q, n, phi, e, d));
-                    window.setStatus("RSA keys ready. Create or join a room.");
+                    window.setStatus("Keys ready. Create or join a room.");
 
                     if (!requestedRoom.isBlank()) {
                         window.setRoomInput(requestedRoom);
@@ -133,15 +134,17 @@ public class Main implements ConnectionAdapter.Listener {
         }
 
         peers.clear();
+        pendingDrafts.clear();
         String invitation = applicationUrl.isBlank() ? "#room=" + roomId : applicationUrl + "#room=" + roomId;
 
         window.setInvitation(invitation);
         window.clearPeerFingerprint();
         window.setConnected(false);
-        window.setStatus("Joining room " + roomId + "...");
+        window.setStatus("Connecting...");
 
         try {
             ConnectionAdapter.joinRoom(roomId);
+            window.setStatus("Waiting for participant.");
         } catch (Throwable error) {
             window.setStatus("Could not join room: " + error.getMessage());
         }
@@ -172,10 +175,11 @@ public class Main implements ConnectionAdapter.Listener {
     private void leaveRoom() {
         ConnectionAdapter.leaveRoom();
         peers.clear();
+        pendingDrafts.clear();
         window.setInvitation("");
         window.clearPeerFingerprint();
         window.setConnected(false);
-        window.setStatus("Left the room.");
+        window.setStatus("Disconnected.");
     }
 
     private void sendMessage() {
@@ -212,8 +216,8 @@ public class Main implements ConnectionAdapter.Listener {
 
             // Mengirim ciphertext sebagai string agar nilai BigInteger tidak berubah ketika melewati browser adapter
             window.addMessage(messageIdentifier, window.getDisplayName(), message, presentation, true);
+            pendingDrafts.put(messageIdentifier, message);
             ConnectionAdapter.sendPacket(recipient.getKey(), packet);
-            window.clearMessageInput();
 
         } catch (IllegalArgumentException | IllegalStateException exception) {
             window.setStatus(exception.getMessage());
@@ -231,7 +235,7 @@ public class Main implements ConnectionAdapter.Listener {
 
             peers.put(peerId, new Peer());
             ConnectionAdapter.sendPacket(peerId, encodePublicKey());
-            window.setStatus("Peer connected. Exchanging RSA public keys...");
+            window.setStatus("Connecting. Exchanging RSA public keys...");
         });
     }
 
@@ -245,8 +249,9 @@ public class Main implements ConnectionAdapter.Listener {
             }
 
             window.clearPeerFingerprint();
+            pendingDrafts.clear();
             window.setConnected(hasReadyPeer());
-            window.setStatus(peer.name + " disconnected.");
+            window.setStatus("Disconnected. " + peer.name + " left the room.");
         });
     }
 
@@ -300,7 +305,7 @@ public class Main implements ConnectionAdapter.Listener {
             peers.put(peerId, new Peer(name, peerModulus, peerExponent));
             window.setPeerFingerprint(name, fingerprint(peerModulus, peerExponent));
             window.setConnected(false);
-            window.setStatus("Connected to " + name + ". Compare fingerprints before messaging.");
+            window.setStatus("Public key received. Compare fingerprints before messaging.");
 
         } catch (RuntimeException exception) {
             window.setStatus("Rejected public key: " + exception.getMessage());
@@ -349,6 +354,13 @@ public class Main implements ConnectionAdapter.Listener {
 
             String messageIdentifier = PacketHandler.parseAcknowledgementPacket(packet);
             window.markDelivered(messageIdentifier);
+            String deliveredDraft = pendingDrafts.remove(messageIdentifier);
+
+            if (deliveredDraft != null) {
+                window.clearMessageInput(deliveredDraft);
+            }
+
+            window.setStatus("Ready. Message delivered.");
 
         } catch (RuntimeException exception) {
             window.setStatus("Rejected acknowledgement: " + exception.getMessage());
@@ -357,7 +369,10 @@ public class Main implements ConnectionAdapter.Listener {
 
     @Override
     public void error(String message) {
-        SwingUtilities.invokeLater(() -> window.setStatus("Connection error: " + message));
+        SwingUtilities.invokeLater(() -> {
+            window.setConnected(false);
+            window.setStatus("Connection error: " + message);
+        });
     }
 
     private void confirmFingerprints() {
@@ -366,7 +381,7 @@ public class Main implements ConnectionAdapter.Listener {
                 peer.verified = true;
                 window.setFingerprintConfirmed();
                 window.setConnected(true);
-                window.setStatus("Fingerprints confirmed. Messaging is enabled.");
+                window.setStatus("Ready.");
 
                 return;
             }

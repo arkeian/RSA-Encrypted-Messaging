@@ -12,10 +12,20 @@
             overflow: hidden;
             background: #171923;
         }
+
+        #loading {
+            position: fixed;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            color: #eeeff4;
+            font: 18px sans-serif;
+        }
     </style>
     <script src="https://cjrtnc.leaningtech.com/4.3/loader.js"></script>
 </head>
 <body>
+    <div id="loading" role="status" aria-live="polite">Loading Java runtime...</div>
     <div id="display"></div>
 
     <script type="module">
@@ -24,6 +34,11 @@
         let room = null;
         let packetAction = null;
         let javaListener = null;
+        const trysteroConfig = {appId: "io.github.rsa-encrypted-messaging"};
+
+        if (Array.isArray(globalThis.RSA_CHAT_TURN_SERVERS) && globalThis.RSA_CHAT_TURN_SERVERS.length > 0) {
+            trysteroConfig.turnConfig = globalThis.RSA_CHAT_TURN_SERVERS;
+        }
 
         async function Java_ConnectionAdapter_registerListener(lib, listener) {
             javaListener = listener;
@@ -42,7 +57,7 @@
             try {
                 room?.leave();
                 room = joinRoom(
-                    {appId: "io.github.rsa-encrypted-messaging"},
+                    trysteroConfig,
                     String(roomId),
                     {
                         onJoinError: details => reportError(details.error),
@@ -85,26 +100,33 @@
             packetAction = null;
         }
 
-        await cheerpjInit({
-            version: 17,
-            natives: {
-                Java_ConnectionAdapter_registerListener,
-                Java_ConnectionAdapter_joinRoom,
-                Java_ConnectionAdapter_sendPacket,
-                Java_ConnectionAdapter_leaveRoom
-            }
-        });
-        cheerpjCreateDisplay(-1, -1, document.getElementById("display"));
-        const applicationUrl = new URL(window.location.href);
-        const requestedRoom = new URLSearchParams(applicationUrl.hash.substring(1)).get("room") ?? "";
-        applicationUrl.search = "";
-        applicationUrl.hash = "";
-        await cheerpjRunMain(
-            "Main",
-            "/app/out/browser/rsa-encrypted-messaging.jar:/app/lib/zxing-core-3.5.4.jar",
-            applicationUrl.href,
-            requestedRoom
-        );
+        try {
+            await cheerpjInit({
+                version: 17,
+                natives: {
+                    Java_ConnectionAdapter_registerListener,
+                    Java_ConnectionAdapter_joinRoom,
+                    Java_ConnectionAdapter_sendPacket,
+                    Java_ConnectionAdapter_leaveRoom
+                }
+            });
+            cheerpjCreateDisplay(-1, -1, document.getElementById("display"));
+            document.getElementById("loading").remove();
+
+            const applicationUrl = new URL(window.location.href);
+            const requestedRoom = new URLSearchParams(applicationUrl.hash.substring(1)).get("room") ?? "";
+            applicationUrl.search = "";
+            applicationUrl.hash = "";
+            await cheerpjRunMain(
+                "Main",
+                "/app/out/browser/rsa-encrypted-messaging.jar:/app/lib/zxing-core-3.5.4.jar",
+                applicationUrl.href,
+                requestedRoom
+            );
+        } catch (error) {
+            document.getElementById("loading").textContent = "Java runtime failed to load.";
+            console.error(error);
+        }
     </script>
 </body>
 </html>
