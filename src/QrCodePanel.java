@@ -36,8 +36,17 @@ public final class QrCodePanel extends JPanel {
 
         if (modules == null) {
             FontMetrics metrics = graphics.getFontMetrics();
+            String[] lines = emptyText.equals("Create or join a room to show its QR code")
+                    ? new String[]{"Create or join a room", "to show its QR code"}
+                    : new String[]{emptyText};
+            int baseline = (getHeight() - lines.length * metrics.getHeight()) / 2 + metrics.getAscent();
             graphics.setColor(Color.DARK_GRAY);
-            graphics.drawString(emptyText, Math.max(8, (getWidth() - metrics.stringWidth(emptyText)) / 2), getHeight() / 2);
+
+            for (String line : lines) {
+                graphics.drawString(line, Math.max(8, (getWidth() - metrics.stringWidth(line)) / 2), baseline);
+                baseline += metrics.getHeight();
+            }
+
             return;
         }
 

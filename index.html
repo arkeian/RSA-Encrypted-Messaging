@@ -10,7 +10,7 @@
             height: 100%;
             margin: 0;
             overflow: hidden;
-            background: #171923;
+            background: #ffffff;
         }
 
         #loading {
@@ -18,8 +18,31 @@
             inset: 0;
             display: grid;
             place-items: center;
-            color: #eeeff4;
+            z-index: 2;
+            background: #ffffff;
+            color: #303234;
             font: 18px sans-serif;
+        }
+
+        .loading-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .spinner {
+            width: 22px;
+            height: 22px;
+            border: 3px solid #d9d9d9;
+            border-top-color: #647783;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         #credit {
@@ -27,14 +50,19 @@
             right: 8px;
             bottom: 4px;
             z-index: 1;
-            color: #aeb2c0;
+            color: #6d7174;
             font: 11px sans-serif;
         }
     </style>
     <script src="https://cjrtnc.leaningtech.com/4.3/loader.js"></script>
 </head>
 <body>
-    <div id="loading" role="status" aria-live="polite">Loading Java runtime...</div>
+    <div id="loading" role="status" aria-live="polite">
+        <div class="loading-content">
+            <span class="spinner" aria-hidden="true"></span>
+            <span>Loading...</span>
+        </div>
+    </div>
     <div id="display"></div>
     <a id="credit" href="https://cheerpj.com" target="_blank" rel="noreferrer">Powered by CheerpJ</a>
 
@@ -54,6 +82,10 @@
         async function Java_ConnectionAdapter_registerListener(lib, listener) {
             javaListener = listener;
             return new Promise(() => {});
+        }
+
+        function Java_ConnectionAdapter_notifyApplicationLoaded() {
+            loading.style.display = "none";
         }
 
         async function reportError(error) {
@@ -116,13 +148,13 @@
                 version: 17,
                 natives: {
                     Java_ConnectionAdapter_registerListener,
+                    Java_ConnectionAdapter_notifyApplicationLoaded,
                     Java_ConnectionAdapter_joinRoom,
                     Java_ConnectionAdapter_sendPacket,
                     Java_ConnectionAdapter_leaveRoom
                 }
             });
             cheerpjCreateDisplay(-1, -1, document.getElementById("display"));
-            loading.style.display = "none";
 
             const applicationUrl = new URL(window.location.href);
             const requestedRoom = new URLSearchParams(applicationUrl.hash.substring(1)).get("room") ?? "";

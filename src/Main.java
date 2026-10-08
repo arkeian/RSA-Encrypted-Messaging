@@ -102,6 +102,8 @@ public class Main implements ConnectionAdapter.Listener {
                     }
                 } catch (Exception exception) {
                     window.setStatus("RSA key generation failed: " + exception.getMessage());
+                } finally {
+                    ConnectionAdapter.applicationLoaded();
                 }
             }
         }.execute();

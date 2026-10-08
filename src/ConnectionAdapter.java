@@ -23,6 +23,15 @@ public final class ConnectionAdapter {
 
     private static native void registerListener(Listener listener);
 
+    public static void applicationLoaded() {
+        try {
+            notifyApplicationLoaded();
+        } catch (UnsatisfiedLinkError ignored) {
+        }
+    }
+
+    private static native void notifyApplicationLoaded();
+
     public static native void joinRoom(String roomId);
 
     public static native void sendPacket(String peerId, String packet);

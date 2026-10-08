@@ -13,17 +13,31 @@ import javax.swing.JSplitPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
+import javax.swing.UIManager;
+import javax.swing.plaf.basic.BasicSplitPaneDivider;
+import javax.swing.plaf.basic.BasicSplitPaneUI;
+import javax.swing.plaf.ColorUIResource;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.Graphics;
 import java.awt.GridLayout;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.util.List;
 
 public final class ChatWindow {
-    private static final Color BACKGROUND = new Color(23, 25, 35);
-    private static final Color PANEL = new Color(34, 37, 49);
-    private static final Color TEXT = new Color(238, 239, 244);
+    private static final Color BACKGROUND = Color.WHITE;
+    private static final Color PANEL = new Color(244, 244, 244);
+    private static final Color BORDER = new Color(178, 181, 184);
+    private static final Color TEXT = new Color(48, 50, 52);
+
+    static {
+        UIManager.put("Button.gradient", List.of(0.3f, 0.0f,
+                new ColorUIResource(225, 225, 225),
+                new ColorUIResource(250, 250, 250),
+                new ColorUIResource(210, 210, 210)));
+    }
 
     private final JFrame frame = new JFrame("Amaca");
     private final JTextField displayName = new JTextField("Guest");
@@ -111,7 +125,7 @@ public final class ChatWindow {
         panel.setPreferredSize(new Dimension(250, 0));
         panel.setLayout(new BorderLayout(8, 8));
         panel.add(new JScrollPane(invitation), BorderLayout.NORTH);
-        qrCode.setBorder(BorderFactory.createLineBorder(new Color(75, 78, 94)));
+        qrCode.setBorder(BorderFactory.createLineBorder(BORDER));
         panel.add(qrCode, BorderLayout.CENTER);
 
         JPanel verification = new JPanel(new BorderLayout(4, 4));
@@ -146,6 +160,20 @@ public final class ChatWindow {
         rsaInspector.add(showProcedure, BorderLayout.SOUTH);
 
         JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, chat, rsaInspector);
+        split.setUI(new BasicSplitPaneUI() {
+            @Override
+            public BasicSplitPaneDivider createDefaultDivider() {
+                return new BasicSplitPaneDivider(this) {
+                    @Override
+                    public void paint(Graphics graphics) {
+                        graphics.setColor(BACKGROUND);
+                        graphics.fillRect(0, 0, getWidth(), getHeight());
+                    }
+                };
+            }
+        });
+        split.setBorder(null);
+        split.setDividerSize(12);
         split.setResizeWeight(0.55);
         split.setDividerLocation(480);
 
@@ -155,7 +183,7 @@ public final class ChatWindow {
     private static JPanel panel(String title) {
         JPanel panel = new JPanel();
         panel.setBackground(PANEL);
-        panel.setBorder(BorderFactory.createTitledBorder(BorderFactory.createLineBorder(new Color(75, 78, 94)), title, 0, 0, null, TEXT));
+        panel.setBorder(BorderFactory.createTitledBorder(BorderFactory.createLineBorder(BORDER), title, 0, 0, null, TEXT));
 
         return panel;
     }
