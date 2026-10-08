@@ -3,6 +3,9 @@ import java.security.SecureRandom;
 
 public class PQGeneration {
     private static final SecureRandom random = new SecureRandom();
+    private static final int[] SMALL_PRIMES = {
+            3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97
+    };
 
     public static BigInteger generateUniformRandomInteger(BigInteger upperExclusive, SecureRandom random) {
         // Memastikan range interval menjadi 0 <= x < upper Exclusive
@@ -27,7 +30,7 @@ public class PQGeneration {
         BigInteger base = generateUniformRandomInteger(n.subtract(BigInteger.valueOf(3)), random).add(BigInteger.TWO);
 
         // x = base^d mod n
-        BigInteger x = ModularArithmetic.modularExponentiation(base, d, n);
+        BigInteger x = base.modPow(d, n);
 
         if (x.equals(BigInteger.ONE) || x.equals(n.subtract(BigInteger.ONE))) {
             return true;
@@ -67,6 +70,17 @@ public class PQGeneration {
         // Jika kandidat genap selain 2, maka bukan prima
         if (candidateRandomInteger.mod(BigInteger.TWO).equals(BigInteger.ZERO)) {
             return false;
+        }
+
+        for (int smallPrime : SMALL_PRIMES) {
+            BigInteger prime = BigInteger.valueOf(smallPrime);
+
+            if (candidateRandomInteger.equals(prime)) {
+                return true;
+            }
+            if (candidateRandomInteger.mod(prime).equals(BigInteger.ZERO)) {
+                return false;
+            }
         }
 
         // Mencari d dan r sehingga:

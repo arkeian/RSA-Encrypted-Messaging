@@ -8,6 +8,7 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTextArea;
@@ -22,6 +23,10 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.GridLayout;
+import java.awt.event.InputEvent;
+import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.util.List;
@@ -58,6 +63,7 @@ public final class ChatWindow {
     private final JButton showProcedure = new JButton("Show RSA procedure");
     private String localFingerprint = "Generating RSA key...";
     private String peerFingerprint = "Waiting for peer...";
+    private String invitationLink = "";
     private RsaPresentationRecord keyPresentation;
     private RsaPresentationRecord currentPresentation;
 
@@ -90,6 +96,10 @@ public final class ChatWindow {
         inspector.setEditable(false);
         inspector.setLineWrap(true);
         inspector.setWrapStyleWord(true);
+        addCopyMenu(fingerprints);
+        addCopyMenu(inspector);
+        addInvitationCopyMenu();
+        addMessageCopyActions();
 
         messageList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         messageList.addListSelectionListener(event -> {
@@ -273,6 +283,7 @@ public final class ChatWindow {
     }
 
     public void setInvitation(String link) {
+        invitationLink = link;
         invitation.setText(link.isBlank() ? "No active room" : "Invitation link:\n" + link);
         qrCode.setInvitation(link);
     }
@@ -311,6 +322,7 @@ public final class ChatWindow {
     public void setStatus(String text) {
         status.setText(text);
         status.setForeground(TEXT);
+        status.setToolTipText(text);
     }
 
     public void addMessage(String identifier, String sender, String text, RsaPresentationRecord presentation, boolean outgoing) {
@@ -376,6 +388,7 @@ public final class ChatWindow {
         controls.add(revealPrivateValues);
 
         details.setEditable(false);
+        addCopyMenu(details);
         blockSelector.addActionListener(event -> updateDetails.run());
         showFullIntegers.addActionListener(event -> updateDetails.run());
         revealPrivateValues.addActionListener(event -> updateDetails.run());
@@ -387,6 +400,68 @@ public final class ChatWindow {
         dialog.setSize(850, 620);
         dialog.setLocationRelativeTo(frame);
         dialog.setVisible(true);
+    }
+
+    private void addInvitationCopyMenu() {
+        JPopupMenu menu = new JPopupMenu();
+        javax.swing.JMenuItem copyLink = new javax.swing.JMenuItem("Copy invitation link");
+        copyLink.addActionListener(event -> ConnectionAdapter.copyText(invitationLink));
+        menu.add(copyLink);
+        invitation.setComponentPopupMenu(menu);
+    }
+
+    private void addCopyMenu(JTextArea textArea) {
+        JPopupMenu menu = new JPopupMenu();
+        javax.swing.JMenuItem copy = new javax.swing.JMenuItem("Copy selected text");
+        copy.addActionListener(event -> {
+            String selectedText = textArea.getSelectedText();
+            if (selectedText != null && !selectedText.isEmpty()) {
+                ConnectionAdapter.copyText(selectedText);
+            }
+        });
+        menu.add(copy);
+        textArea.setComponentPopupMenu(menu);
+    }
+
+    private void addMessageCopyActions() {
+        javax.swing.AbstractAction copySelectedMessage = new javax.swing.AbstractAction() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent event) {
+                Message selected = messageList.getSelectedValue();
+                if (selected != null) {
+                    ConnectionAdapter.copyText(selected.text);
+                }
+            }
+        };
+        messageList.getInputMap(JList.WHEN_FOCUSED)
+                .put(javax.swing.KeyStroke.getKeyStroke(KeyEvent.VK_C, InputEvent.CTRL_DOWN_MASK), "copy-message");
+        messageList.getActionMap().put("copy-message", copySelectedMessage);
+
+        JPopupMenu menu = new JPopupMenu();
+        javax.swing.JMenuItem copy = new javax.swing.JMenuItem("Copy message");
+        copy.addActionListener(copySelectedMessage);
+        menu.add(copy);
+        messageList.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent event) {
+                showMessageMenu(event);
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent event) {
+                showMessageMenu(event);
+            }
+
+            private void showMessageMenu(MouseEvent event) {
+                if (event.isPopupTrigger()) {
+                    int index = messageList.locationToIndex(event.getPoint());
+                    if (index >= 0) {
+                        messageList.setSelectedIndex(index);
+                        menu.show(messageList, event.getX(), event.getY());
+                    }
+                }
+            }
+        });
     }
 
     private static final class Message {

@@ -7,6 +7,10 @@ public final class ConnectionAdapter {
         void packetReceived(String peerId, String packet);
 
         void error(String message);
+
+        void clipboardCopied();
+
+        void clipboardFailed(String message);
     }
 
     private static Listener listener;
@@ -35,6 +39,8 @@ public final class ConnectionAdapter {
     public static native void joinRoom(String roomId);
 
     public static native void sendPacket(String peerId, String packet);
+
+    public static native void copyText(String text);
 
     public static native void leaveRoom();
 }

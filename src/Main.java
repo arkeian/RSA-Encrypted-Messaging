@@ -48,6 +48,7 @@ public class Main implements ConnectionAdapter.Listener {
         window.onSend(this::sendMessage);
         window.onClose(ConnectionAdapter::leaveRoom);
         window.show();
+        ConnectionAdapter.applicationLoaded();
         generateKeys();
     }
 
@@ -102,8 +103,6 @@ public class Main implements ConnectionAdapter.Listener {
                     }
                 } catch (Exception exception) {
                     window.setStatus("RSA key generation failed: " + exception.getMessage());
-                } finally {
-                    ConnectionAdapter.applicationLoaded();
                 }
             }
         }.execute();
@@ -195,9 +194,11 @@ public class Main implements ConnectionAdapter.Listener {
             // Memvalidasi input dan batas ukuran message sebelum proses RSA dilakukan
             PacketHandler.validateOutgoingMessage(message, inputAsBytes);
             Map.Entry<String, Peer> recipient = peers.entrySet().stream()
-                    .filter(entry -> entry.getValue().modulus != null && entry.getValue().verified)
+                    .filter(entry -> entry.getValue().modulus != null
+                            && entry.getValue().verified
+                            && entry.getValue().peerConfirmed)
                     .findFirst()
-                    .orElseThrow(() -> new IllegalStateException("Wait for a peer's RSA public key before sending."));
+                    .orElseThrow(() -> new IllegalStateException("Wait for both participants to confirm fingerprints."));
             Peer peer = recipient.getValue();
 
             // Menyimpan panjang awal text dalam format bytes
@@ -273,6 +274,8 @@ public class Main implements ConnectionAdapter.Listener {
             new Thread(() -> receiveMessage(peerId, packet), "rsa-decryption").start();
         } else if (packet.startsWith("ACK|")) {
             SwingUtilities.invokeLater(() -> receiveAcknowledgement(peerId, packet));
+        } else if (packet.startsWith("CONFIRM|")) {
+            SwingUtilities.invokeLater(() -> receivePeerConfirmation(peerId, packet));
         } else {
             error("Received an unknown packet type.");
         }
@@ -304,10 +307,15 @@ public class Main implements ConnectionAdapter.Listener {
                 throw new IllegalArgumentException("invalid RSA public key");
             }
 
-            peers.put(peerId, new Peer(name, peerModulus, peerExponent));
+            Peer peer = peers.get(peerId);
+            if (peer == null) {
+                throw new IllegalArgumentException("peer disconnected during public-key exchange");
+            }
+            peer.name = name;
+            peer.modulus = peerModulus;
+            peer.exponent = peerExponent;
             window.setPeerFingerprint(name, fingerprint(peerModulus, peerExponent));
-            window.setConnected(false);
-            window.setStatus("Public key received. Compare fingerprints before messaging.");
+            updateConnectionStatus(peer);
 
         } catch (RuntimeException exception) {
             window.setStatus("Rejected public key: " + exception.getMessage());
@@ -318,8 +326,8 @@ public class Main implements ConnectionAdapter.Listener {
         try {
             Peer peer = peers.get(peerId);
 
-            if (peer == null || peer.modulus == null || !peer.verified) {
-                throw new IllegalArgumentException("message arrived before fingerprint confirmation");
+            if (peer == null || peer.modulus == null || !peer.verified || !peer.peerConfirmed) {
+                throw new IllegalArgumentException("both participants must confirm fingerprints before messaging");
             }
 
             // Memvalidasi packet sebelum ciphertext diproses oleh fungsi RSA
@@ -350,8 +358,8 @@ public class Main implements ConnectionAdapter.Listener {
         try {
             Peer peer = peers.get(peerId);
 
-            if (peer == null || !peer.verified) {
-                throw new IllegalArgumentException("acknowledgement arrived before fingerprint confirmation");
+            if (peer == null || !peer.verified || !peer.peerConfirmed) {
+                throw new IllegalArgumentException("both participants must confirm fingerprints before acknowledging");
             }
 
             String messageIdentifier = PacketHandler.parseAcknowledgementPacket(packet);
@@ -373,21 +381,73 @@ public class Main implements ConnectionAdapter.Listener {
     @Override
     public void error(String message) {
         SwingUtilities.invokeLater(() -> {
+            peers.clear();
+            pendingDrafts.clear();
+            window.clearPeerFingerprint();
             window.setConnected(false);
-            window.setStatus("Connection error: " + message);
+            String lowerCaseMessage = message.toLowerCase(java.util.Locale.ROOT);
+            if (lowerCaseMessage.contains("could not connect to peer")) {
+                window.setStatus("WebRTC connection failed. Try another network or configure TURN.");
+            } else {
+                window.setStatus("Connection error: " + message);
+            }
         });
     }
 
+    @Override
+    public void clipboardCopied() {
+        SwingUtilities.invokeLater(() -> window.setStatus("Copied to clipboard."));
+    }
+
+    @Override
+    public void clipboardFailed(String message) {
+        SwingUtilities.invokeLater(() -> window.setStatus("Could not copy to clipboard: " + message));
+    }
+
     private void confirmFingerprints() {
-        for (Peer peer : peers.values()) {
+        for (Map.Entry<String, Peer> entry : peers.entrySet()) {
+            Peer peer = entry.getValue();
             if (peer.modulus != null) {
                 peer.verified = true;
                 window.setFingerprintConfirmed();
-                window.setConnected(true);
-                window.setStatus("Ready.");
+                ConnectionAdapter.sendPacket(entry.getKey(), "CONFIRM|");
+                updateConnectionStatus(peer);
 
                 return;
             }
+        }
+    }
+
+    private void receivePeerConfirmation(String peerId, String packet) {
+        try {
+            if (!packet.equals("CONFIRM|")) {
+                throw new IllegalArgumentException("invalid fingerprint confirmation");
+            }
+
+            Peer peer = peers.get(peerId);
+            if (peer == null) {
+                throw new IllegalArgumentException("confirmation arrived from an unknown peer");
+            }
+
+            peer.peerConfirmed = true;
+            updateConnectionStatus(peer);
+        } catch (RuntimeException exception) {
+            window.setStatus("Rejected peer confirmation: " + exception.getMessage());
+        }
+    }
+
+    private void updateConnectionStatus(Peer peer) {
+        boolean ready = peer.modulus != null && peer.verified && peer.peerConfirmed;
+        window.setConnected(ready);
+
+        if (ready) {
+            window.setStatus("Ready.");
+        } else if (peer.modulus != null && peer.verified) {
+            window.setStatus("Fingerprint confirmed. Waiting for peer to confirm.");
+        } else if (peer.modulus != null && peer.peerConfirmed) {
+            window.setStatus("Peer confirmed. Compare fingerprints and confirm to continue.");
+        } else if (peer.modulus != null) {
+            window.setStatus("Public key received. Compare fingerprints before messaging.");
         }
     }
 
@@ -431,14 +491,15 @@ public class Main implements ConnectionAdapter.Listener {
     }
 
     private boolean hasReadyPeer() {
-        return peers.values().stream().anyMatch(peer -> peer.modulus != null && peer.verified);
+        return peers.values().stream().anyMatch(peer -> peer.modulus != null && peer.verified && peer.peerConfirmed);
     }
 
     private static final class Peer {
         private String name = "Peer";
-        private BigInteger modulus;
-        private BigInteger exponent;
-        private boolean verified;
+        private volatile BigInteger modulus;
+        private volatile BigInteger exponent;
+        private volatile boolean verified;
+        private volatile boolean peerConfirmed;
 
         private Peer() {
         }
