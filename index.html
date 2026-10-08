@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RSA Chitchat</title>
+    <style>
+        html, body, #display {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            background: #171923;
+        }
+    </style>
+    <script src="https://cjrtnc.leaningtech.com/4.3/loader.js"></script>
+</head>
+<body>
+    <div id="display"></div>
+
+    <script type="module">
+        import {joinRoom} from "https://esm.run/trystero@0.25.0";
+
+        let room = null;
+        let packetAction = null;
+        let javaListener = null;
+
+        async function Java_ConnectionAdapter_registerListener(lib, listener) {
+            javaListener = listener;
+            return new Promise(() => {});
+        }
+
+        async function reportError(error) {
+            if (javaListener) {
+                await javaListener.error(String(error?.message ?? error));
+            } else {
+                console.error(error);
+            }
+        }
+
+        async function Java_ConnectionAdapter_joinRoom(lib, roomId) {
+            try {
+                room?.leave();
+                room = joinRoom(
+                    {appId: "io.github.rsa-encrypted-messaging"},
+                    String(roomId),
+                    {
+                        onJoinError: details => reportError(details.error),
+                        onPeerHandshake: () => {
+                            if (room && Object.keys(room.getPeers()).length >= 1) {
+                                throw new Error("Room already has two participants");
+                            }
+                        }
+                    }
+                );
+                packetAction = room.makeAction("rsa-packet");
+
+                room.onPeerJoin = async peerId => {
+                    await javaListener?.peerConnected(peerId);
+                };
+                room.onPeerLeave = async peerId => {
+                    await javaListener?.peerDisconnected(peerId);
+                };
+                packetAction.onMessage = async (packet, {peerId}) => {
+                    await javaListener?.packetReceived(peerId, String(packet));
+                };
+            } catch (error) {
+                await reportError(error);
+            }
+        }
+
+        async function Java_ConnectionAdapter_sendPacket(lib, peerId, packet) {
+            if (!packetAction) {
+                await reportError(new Error("No room is active"));
+                return;
+            }
+
+            packetAction.send(String(packet), {target: String(peerId)})
+                .catch(error => reportError(error));
+        }
+
+        async function Java_ConnectionAdapter_leaveRoom() {
+            room?.leave();
+            room = null;
+            packetAction = null;
+        }
+
+        await cheerpjInit({
+            version: 17,
+            natives: {
+                Java_ConnectionAdapter_registerListener,
+                Java_ConnectionAdapter_joinRoom,
+                Java_ConnectionAdapter_sendPacket,
+                Java_ConnectionAdapter_leaveRoom
+            }
+        });
+        cheerpjCreateDisplay(-1, -1, document.getElementById("display"));
+        const applicationUrl = new URL(window.location.href);
+        const requestedRoom = new URLSearchParams(applicationUrl.hash.substring(1)).get("room") ?? "";
+        applicationUrl.search = "";
+        applicationUrl.hash = "";
+        await cheerpjRunMain(
+            "Main",
+            "/app/out/browser/rsa-encrypted-messaging.jar:/app/lib/zxing-core-3.5.4.jar",
+            applicationUrl.href,
+            requestedRoom
+        );
+    </script>
+</body>
+</html>

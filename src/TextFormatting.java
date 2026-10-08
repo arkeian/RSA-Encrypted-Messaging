@@ -1,4 +1,7 @@
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
@@ -27,6 +30,10 @@ public class TextFormatting {
 
 
     public static BigInteger[] convertBytesToBlocks(byte[] bytes, int plaintextBlockSize) {
+        if (plaintextBlockSize < 1) {
+            throw new IllegalArgumentException("Value of plaintext block size must be greater than 0");
+        }
+
         // Menghitung jumlah total blocks yang ada
         BigInteger[] blocks = new BigInteger[(bytes.length + plaintextBlockSize - 1) / plaintextBlockSize];
 
@@ -46,7 +53,7 @@ public class TextFormatting {
     }
 
     public static String revertBlocksToText(BigInteger[] blocks, int plaintextBlockSize, int inputLengthAsBytes) {
-        if (inputLengthAsBytes < 0 || blocks.length != (inputLengthAsBytes + plaintextBlockSize - 1) / plaintextBlockSize) {
+        if (plaintextBlockSize < 1 || inputLengthAsBytes < 0 || blocks.length != (inputLengthAsBytes + plaintextBlockSize - 1) / plaintextBlockSize) {
             throw new IllegalArgumentException("Invalid values for reverting text");
         }
 
@@ -73,6 +80,14 @@ public class TextFormatting {
         }
 
         // Dekode dari UTF-8 ke dalam bentuk teks message (String) kembali
-        return new String(bytes, StandardCharsets.UTF_8);
+        try {
+            return StandardCharsets.UTF_8.newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(ByteBuffer.wrap(bytes))
+                    .toString();
+        } catch (CharacterCodingException exception) {
+            throw new IllegalArgumentException("Invalid UTF-8 plaintext", exception);
+        }
     }
 }
